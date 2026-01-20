@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguageStore } from '../store/language';
+import BarcodeScanner from '../components/BarcodeScanner';
 
 export function ScanPage() {
   const { t } = useLanguageStore();

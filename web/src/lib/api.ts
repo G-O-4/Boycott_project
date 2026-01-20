@@ -11,11 +11,20 @@ const api = axios.create({
 // Add auth token to requests
 api.interceptors.request.use((config) => {
   const token = useAuthStore.getState().token;
-  if (token) {
+
+  const url = config.url ?? '';
+  const isAuth = url.includes('/auth/login') || url.includes('/auth/register');
+
+  // لا نرسل Authorization في login/register
+  if (!isAuth && token) {
     config.headers.Authorization = `Bearer ${token}`;
+  } else if (isAuth && config.headers?.Authorization) {
+    delete config.headers.Authorization;
   }
+
   return config;
 });
+
 
 // Handle auth errors
 api.interceptors.response.use(

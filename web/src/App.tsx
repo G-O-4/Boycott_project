@@ -14,6 +14,8 @@ import { ProfilePage } from './pages/ProfilePage';
 import { SearchPage } from './pages/SearchPage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
+import { CommunitySubmitPage } from './pages/CommunitySubmitPage';
+
 
 function App() {
   const { language } = useLanguageStore();
@@ -27,6 +29,7 @@ function App() {
 
         {/* Main app routes */}
         <Route element={<Layout />}>
+          <Route path="/community/submit/:type" element={<CommunitySubmitPage />} />
           <Route path="/" element={<HomePage />} />
           <Route path="/scan" element={<ScanPage />} />
           <Route path="/scan/:barcode" element={<ScanResultPage />} />

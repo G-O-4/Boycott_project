@@ -2,10 +2,11 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useLanguageStore } from '../store/language';
 import { useAuthStore } from '../store/auth';
+import { authApi } from '../lib/api';
 
 export function LoginPage() {
   const { t } = useLanguageStore();
-  const { login } = useAuthStore();
+  const setAuth = useAuthStore((s) => s.setAuth);
   const navigate = useNavigate();
   
   const [email, setEmail] = useState('');
@@ -19,21 +20,31 @@ export function LoginPage() {
     setLoading(true);
 
     try {
-      // Demo login - in real app, call API
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      login({
-        id: '1',
-        username: email.split('@')[0],
-        email,
-        displayName: email.split('@')[0],
-      });
+      const res = await authApi.login({ email, password });
+
+      const payload = res.data;
+
+      const user = payload?.data?.user ?? payload?.user;
+      const token = payload?.data?.token ?? payload?.token;
+
+      if (!user || !token) {
+        console.error('Unexpected login response:', payload);
+        throw new Error('Unexpected login response shape');
+      }
+
+      setAuth(user, token);
       navigate('/');
-    } catch (err) {
-      setError('فشل تسجيل الدخول. تأكد من البيانات');
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.error?.message ||
+        err?.response?.data?.message ||
+        'فشل تسجيل الدخول. تأكد من البيانات';
+      setError(msg);
     } finally {
       setLoading(false);
     }
   };
+      
 
   return (
     <div className="min-h-screen bg-dark-900 bg-grid-pattern flex items-center justify-center px-4">
