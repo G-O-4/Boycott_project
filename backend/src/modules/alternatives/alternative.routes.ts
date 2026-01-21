@@ -3,6 +3,7 @@ import {
   getAlternativesByProduct,
   getAlternativesByCategory,
   getTopAlternatives,
+  getRecentAlternatives,
   createAlternative,
   deleteAlternative,
 } from './alternative.controller.js';
@@ -16,6 +17,7 @@ const router = Router();
 router.get('/product/:productId', getAlternativesByProduct);
 router.get('/category/:categoryId', getAlternativesByCategory);
 router.get('/top', getTopAlternatives);
+router.get('/recent', getRecentAlternatives);
 
 // Protected routes
 router.post('/', authenticate, requireRole('MODERATOR', 'ADMIN'), validateRequest(createAlternativeSchema), createAlternative);

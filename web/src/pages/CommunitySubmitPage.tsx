@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { submissionsApi } from '../lib/api';
 import { useLanguageStore } from '../store/language';
+import { useAuthStore } from '../store/auth';
 
 type UiType = 'product' | 'alternative' | 'store' | 'evidence';
 
@@ -12,6 +13,15 @@ export function CommunitySubmitPage() {
 
   const navigate = useNavigate();
   const { language } = useLanguageStore();
+  const { isAuthenticated } = useAuthStore();
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!isAuthenticated) {
+      toast.error('يجب تسجيل الدخول للمساهمة');
+      navigate('/login');
+    }
+  }, [isAuthenticated, navigate]);
 
   // حقول عامة
   const [nameAr, setNameAr] = useState('');
@@ -160,6 +170,12 @@ if (uiType === 'store') {
   proposedData.address = address.trim();
 }
 
+      // Actually call the API
+      await submissionsApi.create({
+        targetType: targetType.toLowerCase() as 'product' | 'company' | 'brand',
+        proposedData,
+        evidenceSources: ev.value,
+      });
 
       toast.success('تم إرسال المساهمة للمراجعة ✅');
       navigate('/community');

@@ -249,3 +249,36 @@ export const deleteAlternative = async (req: AuthRequest, res: Response, next: N
   }
 };
 
+export const getRecentAlternatives = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { limit = '10' } = req.query;
+    const limitNum = Math.min(parseInt(limit as string), 50);
+
+    // Get recently added alternatives
+    const alternatives = await prisma.alternative.findMany({
+      include: {
+        product: {
+          include: {
+            brand: true,
+          },
+        },
+        alternative: {
+          include: {
+            brand: true,
+            category: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limitNum,
+    });
+
+    res.json({
+      success: true,
+      data: alternatives,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+

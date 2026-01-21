@@ -1,9 +1,139 @@
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useLanguageStore } from '../store/language';
+import { productsApi, alternativesApi } from '../lib/api';
+
+interface Stats {
+  totalProducts: number;
+  avoidProducts: number;
+  preferredProducts: number;
+  totalAlternatives: number;
+}
+
+interface TrendingProduct {
+  id: string;
+  nameAr?: string;
+  nameEn: string;
+  verdictLabel: string;
+  scanCount: number;
+  brand?: {
+    nameAr?: string;
+    nameEn: string;
+    company?: {
+      nameAr?: string;
+      nameEn: string;
+    };
+  };
+}
+
+interface RecentAlternative {
+  id: string;
+  product: {
+    id: string;
+    nameAr?: string;
+    nameEn: string;
+    brand?: {
+      nameAr?: string;
+      nameEn: string;
+    };
+  };
+  alternative: {
+    id: string;
+    nameAr?: string;
+    nameEn: string;
+    brand?: {
+      nameAr?: string;
+      nameEn: string;
+    };
+  };
+}
 
 export function HomePage() {
-  const { t } = useLanguageStore();
+  const { t, language } = useLanguageStore();
   const navigate = useNavigate();
+
+  // Stats state
+  const [stats, setStats] = useState<Stats | null>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
+
+  // Trending state
+  const [trending, setTrending] = useState<TrendingProduct[]>([]);
+  const [trendingLoading, setTrendingLoading] = useState(true);
+
+  // Recent alternatives state
+  const [recentAlternatives, setRecentAlternatives] = useState<RecentAlternative[]>([]);
+  const [recentAltsLoading, setRecentAltsLoading] = useState(true);
+
+  // Fetch stats on mount
+  useEffect(() => {
+    productsApi.getStats()
+      .then((res) => {
+        const data = res.data?.data || res.data;
+        setStats(data);
+      })
+      .catch((err) => {
+        console.error('Failed to fetch stats:', err);
+      })
+      .finally(() => {
+        setStatsLoading(false);
+      });
+  }, []);
+
+  // Fetch trending products on mount
+  useEffect(() => {
+    productsApi.getTrending(5)
+      .then((res) => {
+        const data = res.data?.data || res.data || [];
+        setTrending(data);
+      })
+      .catch((err) => {
+        console.error('Failed to fetch trending:', err);
+      })
+      .finally(() => {
+        setTrendingLoading(false);
+      });
+  }, []);
+
+  // Fetch recent alternatives on mount
+  useEffect(() => {
+    alternativesApi.getRecent(5)
+      .then((res) => {
+        const data = res.data?.data || res.data || [];
+        setRecentAlternatives(data);
+      })
+      .catch((err) => {
+        console.error('Failed to fetch recent alternatives:', err);
+      })
+      .finally(() => {
+        setRecentAltsLoading(false);
+      });
+  }, []);
+
+  const getVerdictLabel = (verdict: string) => {
+    switch (verdict) {
+      case 'AVOID':
+        return 'تجنب';
+      case 'CAUTION':
+        return 'احذر';
+      case 'PREFERRED':
+        return 'مفضل';
+      default:
+        return 'غير معروف';
+    }
+  };
+
+  const getVerdictClass = (verdict: string) => {
+    switch (verdict) {
+      case 'AVOID':
+        return 'verdict-avoid';
+      case 'CAUTION':
+        return 'bg-amber-500/20 text-amber-400 border border-amber-500/30';
+      case 'PREFERRED':
+        return 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30';
+      default:
+        return 'bg-dark-600 text-dark-300 border border-dark-500';
+    }
+  };
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6">
@@ -65,15 +195,21 @@ export function HomePage() {
       <section className="mb-10">
         <div className="grid grid-cols-3 gap-3">
           <div className="stat-card">
-            <div className="stat-value">2,547</div>
+            <div className="stat-value">
+              {statsLoading ? '...' : (stats?.totalProducts?.toLocaleString() || '0')}
+            </div>
             <div className="stat-label">منتج في قاعدة البيانات</div>
           </div>
           <div className="stat-card">
-            <div className="stat-value text-red-400">847</div>
+            <div className="stat-value text-red-400">
+              {statsLoading ? '...' : (stats?.avoidProducts?.toLocaleString() || '0')}
+            </div>
             <div className="stat-label">منتج يجب تجنبه</div>
           </div>
           <div className="stat-card">
-            <div className="stat-value text-emerald-400">1,234</div>
+            <div className="stat-value text-emerald-400">
+              {statsLoading ? '...' : (stats?.totalAlternatives?.toLocaleString() || '0')}
+            </div>
             <div className="stat-label">بديل محلي متاح</div>
           </div>
         </div>
@@ -135,33 +271,47 @@ export function HomePage() {
           {t('trending')}
         </h2>
         <div className="glass-card divide-y divide-dark-700">
-          {[
-            { name: 'نسكافيه', brand: 'Nestlé', scans: '1,250', verdict: 'AVOID' },
-            { name: 'شيبس ليز', brand: 'PepsiCo', scans: '890', verdict: 'AVOID' },
-            { name: 'أوريو', brand: 'Mondelez', scans: '756', verdict: 'AVOID' },
-          ].map((item, index) => (
-            <Link
-              key={item.name}
-              to={`/product/${index + 1}`}
-              className="flex items-center gap-4 p-4 hover:bg-dark-700/50 transition-colors"
-            >
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
-                index === 0 ? 'bg-amber-500/20 text-amber-400' :
-                index === 1 ? 'bg-dark-600 text-dark-300' :
-                'bg-orange-500/20 text-orange-400'
-              }`}>
-                {index + 1}
-              </div>
-              <div className="flex-1">
-                <div className="font-medium text-dark-100">{item.name}</div>
-                <div className="text-sm text-dark-400">{item.brand}</div>
-              </div>
-              <div className="text-sm text-dark-500">{item.scans} مسح</div>
-              <div className="verdict-avoid rounded-lg px-2 py-1 text-xs font-medium">
-                تجنب
-              </div>
-            </Link>
-          ))}
+          {trendingLoading ? (
+            <div className="p-6 text-center">
+              <div className="animate-spin w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full mx-auto mb-2" />
+              <p className="text-dark-400 text-sm">جاري التحميل...</p>
+            </div>
+          ) : trending.length > 0 ? (
+            trending.map((item, index) => {
+              const name = language === 'ar' ? (item.nameAr || item.nameEn) : item.nameEn;
+              const brandName = language === 'ar' 
+                ? (item.brand?.company?.nameAr || item.brand?.company?.nameEn || item.brand?.nameAr || item.brand?.nameEn)
+                : (item.brand?.company?.nameEn || item.brand?.nameEn);
+              
+              return (
+                <Link
+                  key={item.id}
+                  to={`/product/${item.id}`}
+                  className="flex items-center gap-4 p-4 hover:bg-dark-700/50 transition-colors"
+                >
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
+                    index === 0 ? 'bg-amber-500/20 text-amber-400' :
+                    index === 1 ? 'bg-dark-600 text-dark-300' :
+                    'bg-orange-500/20 text-orange-400'
+                  }`}>
+                    {index + 1}
+                  </div>
+                  <div className="flex-1">
+                    <div className="font-medium text-dark-100">{name}</div>
+                    <div className="text-sm text-dark-400">{brandName}</div>
+                  </div>
+                  <div className="text-sm text-dark-500">{item.scanCount?.toLocaleString() || 0} مسح</div>
+                  <div className={`${getVerdictClass(item.verdictLabel)} rounded-lg px-2 py-1 text-xs font-medium`}>
+                    {getVerdictLabel(item.verdictLabel)}
+                  </div>
+                </Link>
+              );
+            })
+          ) : (
+            <div className="p-6 text-center">
+              <p className="text-dark-400 text-sm">لا توجد منتجات رائجة بعد</p>
+            </div>
+          )}
         </div>
       </section>
 
@@ -172,19 +322,39 @@ export function HomePage() {
           بدائل مضافة حديثاً
         </h2>
         <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4">
-          {[
-            { name: 'آر سي كولا', replaces: 'كوكا كولا' },
-            { name: 'توفي ليبيا', replaces: 'كيتكات' },
-            { name: 'حليب الريف', replaces: 'حليب نستله' },
-          ].map((alt) => (
-            <div key={alt.name} className="flex-shrink-0 glass-card p-4 w-44">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center mb-3">
-                <span className="text-emerald-400 font-bold">✓</span>
-              </div>
-              <div className="font-medium text-dark-100 text-sm mb-1">{alt.name}</div>
-              <div className="text-xs text-dark-400">بديل لـ {alt.replaces}</div>
+          {recentAltsLoading ? (
+            <div className="flex-shrink-0 glass-card p-4 w-44 text-center">
+              <div className="animate-spin w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full mx-auto mb-2" />
+              <p className="text-dark-400 text-xs">جاري التحميل...</p>
             </div>
-          ))}
+          ) : recentAlternatives.length > 0 ? (
+            recentAlternatives.map((alt) => {
+              const altName = language === 'ar' 
+                ? (alt.alternative?.nameAr || alt.alternative?.nameEn) 
+                : alt.alternative?.nameEn;
+              const replacesName = language === 'ar'
+                ? (alt.product?.nameAr || alt.product?.nameEn)
+                : alt.product?.nameEn;
+              
+              return (
+                <Link 
+                  key={alt.id} 
+                  to={`/product/${alt.alternative?.id}`}
+                  className="flex-shrink-0 glass-card p-4 w-44 hover:border-emerald-500/30 transition-all"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center mb-3">
+                    <span className="text-emerald-400 font-bold">✓</span>
+                  </div>
+                  <div className="font-medium text-dark-100 text-sm mb-1 truncate">{altName}</div>
+                  <div className="text-xs text-dark-400 truncate">بديل لـ {replacesName}</div>
+                </Link>
+              );
+            })
+          ) : (
+            <div className="flex-shrink-0 glass-card p-4 w-44 text-center">
+              <p className="text-dark-400 text-xs">لا توجد بدائل بعد</p>
+            </div>
+          )}
         </div>
       </section>
 

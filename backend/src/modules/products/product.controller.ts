@@ -394,3 +394,100 @@ export const recordScan = async (req: AuthRequest, res: Response, next: NextFunc
   }
 };
 
+export const getTrendingProducts = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { limit = '10' } = req.query;
+    const limitNum = Math.min(parseInt(limit as string), 50);
+
+    // Get products with most scans in the last 30 days
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+    const trendingData = await prisma.scanHistory.groupBy({
+      by: ['productId'],
+      where: {
+        createdAt: { gte: thirtyDaysAgo },
+      },
+      _count: {
+        productId: true,
+      },
+      orderBy: {
+        _count: {
+          productId: 'desc',
+        },
+      },
+      take: limitNum,
+    });
+
+    // Get product details for trending products
+    const productIds = trendingData.map((t) => t.productId);
+    const products = await prisma.product.findMany({
+      where: { id: { in: productIds } },
+      include: {
+        brand: {
+          include: {
+            company: {
+              select: {
+                id: true,
+                nameEn: true,
+                nameAr: true,
+                verdictLabel: true,
+              },
+            },
+          },
+        },
+        category: true,
+      },
+    });
+
+    // Combine with scan counts and maintain order
+    const trending = trendingData.map((t) => {
+      const product = products.find((p) => p.id === t.productId);
+      return {
+        ...product,
+        scanCount: t._count.productId,
+      };
+    }).filter(Boolean);
+
+    res.json({
+      success: true,
+      data: trending,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getStats = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const [
+      totalProducts,
+      avoidProducts,
+      preferredProducts,
+      totalAlternatives,
+      totalCompanies,
+      avoidCompanies,
+    ] = await Promise.all([
+      prisma.product.count(),
+      prisma.product.count({ where: { verdictLabel: 'AVOID' } }),
+      prisma.product.count({ where: { verdictLabel: 'PREFERRED' } }),
+      prisma.alternative.count(),
+      prisma.company.count(),
+      prisma.company.count({ where: { verdictLabel: 'AVOID' } }),
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        totalProducts,
+        avoidProducts,
+        preferredProducts,
+        totalAlternatives,
+        totalCompanies,
+        avoidCompanies,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+

@@ -1,24 +1,146 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useLanguageStore } from '../store/language';
+import { usersApi, submissionsApi } from '../lib/api';
 
-const recentSubmissions = [
-  { id: '1', type: 'product', nameAr: 'شوكولاتة ميلكا', status: 'pending', user: 'أحمد م.', time: 'منذ ساعة' },
-  { id: '2', type: 'alternative', nameAr: 'بسكويت التاج', status: 'approved', user: 'سارة ع.', time: 'منذ 3 ساعات' },
-  { id: '3', type: 'store', nameAr: 'سوبر ماركت النور', status: 'pending', user: 'محمد ك.', time: 'منذ 5 ساعات' },
-];
+interface LeaderboardUser {
+  id: string;
+  displayName: string;
+  displayNameAr?: string;
+  avatar?: string;
+  scoreTotal: number;
+  reputationLevel: number;
+  _count?: {
+    submissions: number;
+    storeConfirmations: number;
+  };
+}
 
-const leaderboard = [
-  { rank: 1, name: 'أحمد محمد', points: 1250, badge: '🏆' },
-  { rank: 2, name: 'سارة علي', points: 980, badge: '🥈' },
-  { rank: 3, name: 'محمد خالد', points: 756, badge: '🥉' },
-  { rank: 4, name: 'فاطمة عمر', points: 620, badge: '' },
-  { rank: 5, name: 'عمر حسن', points: 543, badge: '' },
-];
+interface Submission {
+  id: string;
+  targetType: string;
+  proposedData: string;
+  status: string;
+  createdAt: string;
+  submitter: {
+    id: string;
+    displayName: string;
+    displayNameAr?: string;
+    avatar?: string;
+    reputationLevel: number;
+  };
+  voteCounts?: {
+    support: number;
+    needsEvidence: number;
+    disagree: number;
+  };
+}
 
 export function CommunityPage() {
-  const { t } = useLanguageStore();
+  const { t, language } = useLanguageStore();
   const [activeTab, setActiveTab] = useState<'contribute' | 'leaderboard' | 'recent'>('contribute');
+  
+  // Leaderboard state
+  const [leaderboard, setLeaderboard] = useState<LeaderboardUser[]>([]);
+  const [leaderboardLoading, setLeaderboardLoading] = useState(false);
+  
+  // Recent submissions state
+  const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [submissionsLoading, setSubmissionsLoading] = useState(false);
+  
+  // Community stats state
+  const [stats, setStats] = useState({
+    activeContributors: 0,
+    monthlySubmissions: 0,
+    approvalRate: 0,
+  });
+
+  // Fetch leaderboard when tab is selected
+  useEffect(() => {
+    if (activeTab === 'leaderboard' && leaderboard.length === 0) {
+      setLeaderboardLoading(true);
+      usersApi.getLeaderboard({ limit: 10 })
+        .then((res) => {
+          const data = res.data?.data?.leaderboard || res.data?.leaderboard || [];
+          setLeaderboard(data);
+        })
+        .catch((err) => {
+          console.error('Failed to fetch leaderboard:', err);
+        })
+        .finally(() => {
+          setLeaderboardLoading(false);
+        });
+    }
+  }, [activeTab, leaderboard.length]);
+
+  // Fetch recent submissions when tab is selected
+  useEffect(() => {
+    if (activeTab === 'recent' && submissions.length === 0) {
+      setSubmissionsLoading(true);
+      submissionsApi.getAll({ limit: 10 })
+        .then((res) => {
+          const data = res.data?.data?.submissions || res.data?.submissions || [];
+          setSubmissions(data);
+          
+          // Calculate stats from submissions
+          const approved = data.filter((s: Submission) => s.status === 'APPROVED').length;
+          const total = data.length;
+          setStats({
+            activeContributors: new Set(data.map((s: Submission) => s.submitter?.id)).size,
+            monthlySubmissions: total,
+            approvalRate: total > 0 ? Math.round((approved / total) * 100) : 0,
+          });
+        })
+        .catch((err) => {
+          console.error('Failed to fetch submissions:', err);
+        })
+        .finally(() => {
+          setSubmissionsLoading(false);
+        });
+    }
+  }, [activeTab, submissions.length]);
+
+  // Parse proposed data to get name
+  const getSubmissionName = (sub: Submission) => {
+    try {
+      const data = JSON.parse(sub.proposedData);
+      return language === 'ar' ? (data.nameAr || data.nameEn || 'بدون اسم') : (data.nameEn || data.nameAr || 'No name');
+    } catch {
+      return 'بدون اسم';
+    }
+  };
+
+  // Get submission type for display
+  const getSubmissionType = (sub: Submission) => {
+    try {
+      const data = JSON.parse(sub.proposedData);
+      return data.uiType || sub.targetType?.toLowerCase() || 'product';
+    } catch {
+      return sub.targetType?.toLowerCase() || 'product';
+    }
+  };
+
+  // Format relative time
+  const formatRelativeTime = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffHours / 24);
+    
+    if (diffHours < 1) return 'منذ دقائق';
+    if (diffHours < 24) return `منذ ${diffHours} ساعة`;
+    if (diffDays < 7) return `منذ ${diffDays} يوم`;
+    return date.toLocaleDateString(language === 'ar' ? 'ar-LY' : 'en-US');
+  };
+
+  // Get badge for rank
+  const getRankBadge = (rank: number) => {
+    if (rank === 1) return '🏆';
+    if (rank === 2) return '🥈';
+    if (rank === 3) return '🥉';
+    return '';
+  };
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6">
@@ -117,22 +239,41 @@ export function CommunityPage() {
             <h3 className="font-bold text-dark-100">أفضل المساهمين هذا الشهر</h3>
           </div>
           <div className="divide-y divide-dark-700">
-            {leaderboard.map((user) => (
-              <div key={user.rank} className="p-4 flex items-center gap-4 hover:bg-dark-700/30 transition-colors">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
-                  user.rank === 1 ? 'bg-amber-500/20 text-amber-400' :
-                  user.rank === 2 ? 'bg-dark-600 text-dark-300' :
-                  user.rank === 3 ? 'bg-orange-500/20 text-orange-400' :
-                  'bg-dark-700 text-dark-400'
-                }`}>
-                  {user.badge || user.rank}
-                </div>
-                <div className="flex-1">
-                  <p className="font-medium text-dark-100">{user.name}</p>
-                </div>
-                <div className="text-brand-400 font-bold">{user.points.toLocaleString()} نقطة</div>
+            {leaderboardLoading ? (
+              <div className="p-8 text-center">
+                <div className="animate-spin w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full mx-auto mb-2" />
+                <p className="text-dark-400">جاري التحميل...</p>
               </div>
-            ))}
+            ) : leaderboard.length === 0 ? (
+              <div className="p-8 text-center">
+                <p className="text-dark-400">لا يوجد مساهمين بعد</p>
+              </div>
+            ) : (
+              leaderboard.map((user, index) => {
+                const rank = index + 1;
+                const badge = getRankBadge(rank);
+                const name = language === 'ar' 
+                  ? (user.displayNameAr || user.displayName)
+                  : (user.displayName || user.displayNameAr);
+                
+                return (
+                  <div key={user.id} className="p-4 flex items-center gap-4 hover:bg-dark-700/30 transition-colors">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
+                      rank === 1 ? 'bg-amber-500/20 text-amber-400' :
+                      rank === 2 ? 'bg-dark-600 text-dark-300' :
+                      rank === 3 ? 'bg-orange-500/20 text-orange-400' :
+                      'bg-dark-700 text-dark-400'
+                    }`}>
+                      {badge || rank}
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-medium text-dark-100">{name}</p>
+                    </div>
+                    <div className="text-brand-400 font-bold">{user.scoreTotal.toLocaleString()} نقطة</div>
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
       )}
@@ -144,29 +285,55 @@ export function CommunityPage() {
             <h3 className="font-bold text-dark-100">المساهمات الأخيرة</h3>
           </div>
           <div className="divide-y divide-dark-700">
-            {recentSubmissions.map((sub) => (
-              <div key={sub.id} className="p-4 flex items-center gap-4">
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                  sub.type === 'product' ? 'bg-red-500/20' :
-                  sub.type === 'alternative' ? 'bg-emerald-500/20' :
-                  'bg-brand-500/20'
-                }`}>
-                  {sub.type === 'product' ? '📦' :
-                   sub.type === 'alternative' ? '✅' : '📍'}
-                </div>
-                <div className="flex-1">
-                  <p className="font-medium text-dark-100">{sub.nameAr}</p>
-                  <p className="text-sm text-dark-500">بواسطة {sub.user} • {sub.time}</p>
-                </div>
-                <span className={`tag ${
-                  sub.status === 'approved' 
-                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
-                    : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                }`}>
-                  {sub.status === 'approved' ? 'موافق عليه' : 'قيد المراجعة'}
-                </span>
+            {submissionsLoading ? (
+              <div className="p-8 text-center">
+                <div className="animate-spin w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full mx-auto mb-2" />
+                <p className="text-dark-400">جاري التحميل...</p>
               </div>
-            ))}
+            ) : submissions.length === 0 ? (
+              <div className="p-8 text-center">
+                <p className="text-dark-400">لا توجد مساهمات بعد</p>
+                <Link to="/community/submit/product" className="btn-primary mt-4 inline-block">
+                  كن أول من يساهم
+                </Link>
+              </div>
+            ) : (
+              submissions.map((sub) => {
+                const subType = getSubmissionType(sub);
+                const submitterName = language === 'ar'
+                  ? (sub.submitter?.displayNameAr || sub.submitter?.displayName || 'مجهول')
+                  : (sub.submitter?.displayName || sub.submitter?.displayNameAr || 'Anonymous');
+                
+                return (
+                  <div key={sub.id} className="p-4 flex items-center gap-4">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                      subType === 'product' ? 'bg-red-500/20' :
+                      subType === 'alternative' ? 'bg-emerald-500/20' :
+                      'bg-brand-500/20'
+                    }`}>
+                      {subType === 'product' ? '📦' :
+                       subType === 'alternative' ? '✅' : '📍'}
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-medium text-dark-100">{getSubmissionName(sub)}</p>
+                      <p className="text-sm text-dark-500">
+                        بواسطة {submitterName} • {formatRelativeTime(sub.createdAt)}
+                      </p>
+                    </div>
+                    <span className={`tag ${
+                      sub.status === 'APPROVED' 
+                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
+                        : sub.status === 'REJECTED'
+                        ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                        : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                    }`}>
+                      {sub.status === 'APPROVED' ? 'موافق عليه' : 
+                       sub.status === 'REJECTED' ? 'مرفوض' : 'قيد المراجعة'}
+                    </span>
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
       )}
@@ -174,15 +341,15 @@ export function CommunityPage() {
       {/* Stats */}
       <div className="mt-8 grid grid-cols-3 gap-3">
         <div className="stat-card">
-          <div className="stat-value">1,247</div>
+          <div className="stat-value">{stats.activeContributors || '—'}</div>
           <div className="stat-label">مساهم نشط</div>
         </div>
         <div className="stat-card">
-          <div className="stat-value">3,891</div>
+          <div className="stat-value">{stats.monthlySubmissions || '—'}</div>
           <div className="stat-label">مساهمة هذا الشهر</div>
         </div>
         <div className="stat-card">
-          <div className="stat-value">89%</div>
+          <div className="stat-value">{stats.approvalRate ? `${stats.approvalRate}%` : '—'}</div>
           <div className="stat-label">نسبة القبول</div>
         </div>
       </div>

@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 export const createSubmissionSchema = z.object({
   body: z.object({
-    targetType: z.enum(['product', 'company', 'brand']),
+    targetType: z.enum(['product', 'company', 'brand', 'store', 'claim']),
     targetId: z.string().optional(), // If updating existing entity
     proposedData: z.object({
       nameEn: z.string().optional(),
@@ -11,12 +11,19 @@ export const createSubmissionSchema = z.object({
       brandName: z.string().optional(),
       companyName: z.string().optional(),
       verdictLabel: z.enum(['AVOID', 'CAUTION', 'UNKNOWN', 'PREFERRED']).optional(),
+      // Store-specific fields
+      city: z.string().optional(),
+      address: z.string().optional(),
+      // Metadata fields from frontend
+      note: z.string().optional(),
+      uiType: z.string().optional(),
+      language: z.string().optional(),
       claims: z.array(z.object({
         title: z.string(),
         description: z.string(),
         issueType: z.string(),
       })).optional(),
-    }),
+    }).passthrough(), // Allow additional fields
     evidenceSources: z.array(z.string().url()).min(0),
     proposedAlternatives: z.array(z.object({
       name: z.string(),

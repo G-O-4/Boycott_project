@@ -81,6 +81,12 @@ export const productsApi = {
 
   recordScan: (id: string, sessionId?: string) =>
     api.post(`/products/${id}/scan`, { sessionId }),
+
+  getTrending: (limit?: number) =>
+    api.get('/products/trending', { params: { limit } }),
+
+  getStats: () =>
+    api.get('/products/stats'),
 };
 
 // Companies API
@@ -111,6 +117,9 @@ export const alternativesApi = {
 
   getTop: (params?: { city?: string; limit?: number }) =>
     api.get('/alternatives/top', { params }),
+
+  getRecent: (limit?: number) =>
+    api.get('/alternatives/recent', { params: { limit } }),
 };
 
 // Stores API

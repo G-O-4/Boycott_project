@@ -8,6 +8,8 @@ import {
   getProductAlternatives,
   getProductClaims,
   recordScan,
+  getTrendingProducts,
+  getStats,
 } from './product.controller.js';
 import { authenticate, optionalAuth, requireRole } from '../../middleware/auth.js';
 import { validateRequest } from '../../middleware/validate.js';
@@ -17,6 +19,8 @@ const router = Router();
 
 // Public routes (with optional auth for scan tracking)
 router.get('/', getAllProducts);
+router.get('/trending', getTrendingProducts);
+router.get('/stats', getStats);
 router.get('/barcode/:barcode', optionalAuth, getProductByBarcode);
 router.get('/:id', optionalAuth, getProductById);
 router.get('/:id/alternatives', getProductAlternatives);
