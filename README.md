@@ -147,7 +147,7 @@ Docker makes database setup simple and consistent across all machines.
 
 ```bash
 # Clone the repository
-git clone <repository-url>
+git clone https://github.com/G-O-4/Boycott_project.git
 cd Boycott_project
 
 # Start PostgreSQL with Docker
